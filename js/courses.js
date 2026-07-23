@@ -631,7 +631,7 @@ const COURSE_IMAGES = {};
 (function () {
   const b64 = (typeof window !== 'undefined' && window.COURSE_IMAGE_B64) || {};
   for (let i = 1; i <= 27; i++) {
-    COURSE_IMAGES[i] = b64[i] || ('images/course_' + i + '.jpeg');
+    COURSE_IMAGES[i] = b64['course_' + i] || ('images/course_' + i + '.jpeg');
   }
 })();
 
