@@ -1,0 +1,12 @@
+.workbuddy/
+scripts/
+supabase/
+generated-images/
+images/
+*.md
+*.sql
+*.py
+seed-*.js
+verify-*.js
+extract_docx.py
+.DS_Store

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台 - 华大教育研学管理系统</title>
+  <!-- 安全响应头：降低 XSS / 点击劫持 / 数据外泄风险 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.supabase.co https://*.supabase.in; font-src 'self' data:; connect-src 'self' https://bqyibvetyoooyogjtqeu.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="Referrer-Policy" content="no-referrer">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(), camera=()">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/png" href="images/logo-huada.png">
+</head>
+<body>
+
+  <!-- ========== 未配置提示 ========== -->
+  <div id="configBanner" style="display:none;background:#FEF3C7;border-bottom:2px solid #F59E0B;padding:10px 20px;text-align:center;font-size:14px;color:#92400E;">
+    ⚠️ 系统尚未连接云端数据库，数据无法加载。请联系管理员配置 Supabase（参考 supabase-setup.sql 和 js/supabase-config.js）
+  </div>
+
+  <!-- ========== 登录页 DNA 背景 ========== -->
+  <div class="login-bg" id="loginBg" style="display:none;">
+    <div class="bg-base"></div>
+    <div class="bg-glow">
+      <span class="glow-1"></span><span class="glow-2"></span><span class="glow-3"></span>
+    </div>
+    <div class="bg-grid"></div>
+    <canvas id="dna" class="login-dna"></canvas>
+  </div>
+
+  <!-- ========== 登录页 ========== -->
+  <div class="admin-login-page" id="loginPage" style="display:none;">
+    <div class="login-brand">
+      <img class="logo-img" src="images/logo-huada.png" alt="华大BGI" onerror="if(window.HD_ASSETS&&window.HD_ASSETS.logo)this.src=window.HD_ASSETS.logo">
+      <div>
+        <div class="t1">华大教育研学管理系统</div>
+        <div class="t2">BGI · LIFE SCIENCE RESEARCH</div>
+      </div>
+    </div>
+    <div class="admin-login-box">
+      <h1>欢迎回来</h1>
+      <p class="subtitle">管理后台 · 课程报名与排期交付</p>
+
+      <!-- 手机号 + 密码登录 -->
+      <div id="pwdForm">
+        <div class="form-group">
+          <label style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;display:block;">登录手机号</label>
+          <input type="tel" class="form-control" id="loginPhone" placeholder="请输入11位手机号" value="13800000000">
+        </div>
+        <div class="form-group">
+          <label style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;display:block;">密码</label>
+          <input type="password" class="form-control" id="loginPassword" placeholder="请输入密码" value="a123456">
+        </div>
+        <button class="btn-login" onclick="Admin.login()">登 录</button>
+        <div class="login-hint">默认主管理员：手机号 13800000000 ／ 初始密码 a123456（登录后请修改）</div>
+      </div>
+
+      <div style="text-align:center;margin-top:14px;">
+        <a href="index.html" style="font-size:13px;color:var(--text-muted);">&larr; 返回选课页面</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 管理后台布局 ========== -->
+  <div class="admin-layout" id="adminLayout" style="display:none;">
+
+    <!-- 侧边栏 -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-header">
+        <h2>华大教育</h2>
+        <p>研学管理后台</p>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-nav-item active" data-page="dashboard" onclick="Admin.switchPage('dashboard')">
+          <span>📊</span> <span>数据总览</span>
+        </div>
+        <div class="sidebar-nav-item" id="nav-analytics" data-page="analytics" onclick="Admin.switchPage('analytics')">
+          <span>📈</span> <span>数据看板</span>
+        </div>
+        <div class="sidebar-nav-item" id="nav-board" data-page="board" onclick="Admin.switchPage('board')">
+          <span>📅</span> <span>排期看板</span>
+        </div>
+        <div class="sidebar-nav-item" id="nav-calendar" data-page="calendar" onclick="Admin.switchPage('calendar')">
+          <span>🗓️</span> <span>排期日历</span>
+        </div>
+        <div class="sidebar-nav-item" id="nav-teacher" data-page="teacher" onclick="Admin.switchPage('teacher')">
+          <span>🎓</span> <span>讲师端</span>
+        </div>
+        <div class="sidebar-nav-item" id="nav-admins" data-page="admins" onclick="Admin.switchPage('admins')">
+          <span>👥</span> <span>管理员管理</span>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="avatar" id="adminAvatar">A</div>
+          <div class="info">
+            <div class="name" id="adminName">admin</div>
+            <div class="role">管理员</div>
+          </div>
+        </div>
+        <button class="btn-logout" onclick="Admin.logout()">
+          <span>退出登录</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="admin-main">
+
+      <!-- 顶部栏：选课页面跳转（右上角，与选课页跳转管理后台同模式） -->
+      <div class="admin-topbar">
+        <div class="admin-topbar-brand">华大教育研学管理系统 · 管理后台</div>
+        <a href="index.html" class="btn-admin-link" title="前往选课 / 报名页面">
+          <span>&larr;</span>
+          <span>选课页面</span>
+        </a>
+      </div>
+
+      <!-- 数据总览页 -->
+      <div id="page-dashboard">
+        <div class="admin-page-title">数据总览</div>
+
+        <!-- 统计卡片 -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--primary-light);">📋</div>
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-label">总报名数</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--green-light);">👥</div>
+            <div class="stat-value" id="statPeople">0</div>
+            <div class="stat-label">总参访人数</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--purple-light);">💰</div>
+            <div class="stat-value" id="statRevenue">¥0</div>
+            <div class="stat-label">预计总收入</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:var(--orange);background:rgba(245,158,11,0.15);">📅</div>
+            <div class="stat-value" id="statToday">0</div>
+            <div class="stat-label">今日新增</div>
+          </div>
+        </div>
+
+        <!-- 状态流程管道 -->
+        <div class="status-pipeline" id="statusPipeline"></div>
+
+        <!-- 工具栏 -->
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <select class="filter-select" id="filterCity" onchange="Admin.renderTable()">
+              <option value="">全部城市</option>
+              <option value="深圳">深圳</option>
+              <option value="武汉">武汉</option>
+              <option value="杭州">杭州</option>
+            </select>
+            <select class="filter-select" id="filterStatus" onchange="Admin.renderTable()">
+              <option value="">全部状态</option>
+              <option value="待审核">待审核</option>
+              <option value="已确认">已确认</option>
+              <option value="已排课">已排课</option>
+              <option value="已拒绝">已拒绝</option>
+              <option value="已交付">已交付</option>
+              <option value="已完成">已完成</option>
+            </select>
+            <input type="text" class="filter-input" id="filterSearch" placeholder="搜索..." oninput="Admin.renderTable()">
+          </div>
+          <div class="toolbar-right">
+            <button class="btn-export" onclick="Admin.exportCSV()">📥 导出数据</button>
+          </div>
+        </div>
+
+        <!-- 数据表格 -->
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>编号</th>
+                <th>城市</th>
+                <th>状态</th>
+                <th>机构名称</th>
+                <th id="thContact">联系人</th>
+                <th id="thPhone">手机号</th>
+                <th id="thDate" style="min-width:80px;">日期</th>
+                <th>人数</th>
+                <th>课程</th>
+                <th>午餐</th>
+                <th>总费用</th>
+                <th>提交时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="dataTableBody">
+              <!-- 由 JS 渲染 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 排期看板页 -->
+      <div id="page-board" style="display:none;">
+        <div class="admin-page-title">排期看板</div>
+        <div class="board-wrap" id="boardContent">
+          <!-- 由 JS 渲染 -->
+        </div>
+      </div>
+
+      <!-- 数据看板页 -->
+      <div id="page-analytics" style="display:none;">
+        <div class="admin-page-title">数据看板</div>
+        <div id="analyticsContent">
+          <!-- 由 JS 渲染 -->
+        </div>
+      </div>
+
+      <!-- 排期日历页 -->
+      <div id="page-calendar" style="display:none;">
+        <div class="admin-page-title">排期日历</div>
+        <div id="calendarContent">
+          <!-- 由 JS 渲染 -->
+        </div>
+      </div>
+
+      <!-- 讲师端页 -->
+      <div id="page-teacher" style="display:none;">
+        <div class="admin-page-title">讲师端 · 我的排课</div>
+        <div id="teacherContent">
+          <!-- 由 JS 渲染 -->
+        </div>
+      </div>
+
+      <!-- 管理员管理页 -->
+      <div id="page-admins" style="display:none;">
+        <div class="admin-page-title">管理员管理</div>
+
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <span style="font-size:14px;color:var(--text-secondary);">已配置 <strong id="adminCount">0</strong> 个管理员账户</span>
+          </div>
+          <div class="toolbar-right">
+            <button class="btn-add-admin" onclick="Admin.showAddAdminModal()">+ 添加管理员</button>
+          </div>
+        </div>
+
+        <div class="admin-list-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>姓名</th>
+                <th>手机号（登录账号）</th>
+                <th>角色</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="adminTableBody">
+              <!-- 由 JS 渲染 -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 账号设置区域 -->
+        <div class="section-card" style="margin-top:24px;">
+          <h2>账号设置</h2>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>当前登录手机号</label>
+              <input type="text" class="form-control" id="changePwdUsername" readonly>
+            </div>
+            <div class="form-group">
+              <label>原密码</label>
+              <input type="password" class="form-control" id="changePwdOld" placeholder="请输入原密码">
+            </div>
+            <div class="form-group">
+              <label>新密码</label>
+              <input type="password" class="form-control" id="changePwdNew" placeholder="请输入新密码（至少6位）">
+            </div>
+          </div>
+          <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;">
+            <button class="btn-modal btn-confirm" onclick="Admin.changePassword()">确认修改密码</button>
+            <button class="btn-modal btn-cancel" onclick="Admin.showChangeUsernameModal()">修改登录手机号</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ========== 模态框 ========== -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modalBox"></div>
+  </div>
+
+  <!-- ========== Toast ========== -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ========== 脚本 ========== -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script>
+    // 检查 Supabase 是否配置
+    if (!isSupabaseConfigured()) {
+      document.getElementById('configBanner').style.display = 'block';
+    }
+  </script>
+  <script src="js/img/chunk1.js"></script>
+  <script src="js/img/chunk2.js"></script>
+  <script src="js/img/asset1.js"></script>
+  <script src="js/courses.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/bg-dna.js"></script>
+  <script src="js/lib/docx.umd.js"></script>
+  <script src="js/lib/FileSaver.min.js"></script>
+  <script src="js/export-confirm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
