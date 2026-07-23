@@ -478,6 +478,18 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   gap: 4px;
 }
 
+/* 课程卡片正面简介（需求 2.1：卡片含简介） */
+.course-intro {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* 课程详情 - 默认隐藏 */
 .course-detail-wrap {
   max-height: 0;

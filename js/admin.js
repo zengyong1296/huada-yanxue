@@ -188,8 +188,30 @@ const Admin = {
   async renderAll() {
     this.allSubmissions = await Storage.getSubmissions();
     this.allAdmins = await Storage.getAdmins();
+    this.populateFilters();
     this.renderStats();
     this.renderTable();
+  },
+
+  // 填充后台筛选下拉：课程（静态，来自 COURSES）+ 机构（动态，来自已加载数据）
+  populateFilters() {
+    const fc = document.getElementById('filterCourse');
+    if (fc && fc.options.length <= 1) {
+      (typeof COURSES !== 'undefined' ? COURSES : []).forEach(c => {
+        const o = document.createElement('option');
+        o.value = c.id;
+        o.textContent = c.title;
+        fc.appendChild(o);
+      });
+    }
+    const fo = document.getElementById('filterOrg');
+    if (fo) {
+      const orgs = [...new Set((this.allSubmissions || []).map(s => s.org).filter(Boolean))].sort();
+      const cur = fo.value;
+      fo.innerHTML = '<option value="">全部机构</option>' +
+        orgs.map(o => `<option value="${this.escapeHtml(o)}">${this.escapeHtml(o)}</option>`).join('');
+      if (orgs.includes(cur)) fo.value = cur;
+    }
   },
 
   // 局部更新：操作成功后直接改本地数组并仅重渲染表格/统计，免全量重拉与整页闪烁
@@ -288,10 +310,14 @@ const Admin = {
     let submissions = this.getVisibleSubmissions();
     const city = document.getElementById('filterCity').value;
     const status = document.getElementById('filterStatus').value;
+    const course = document.getElementById('filterCourse').value;
+    const org = document.getElementById('filterOrg').value;
     const search = document.getElementById('filterSearch').value.trim().toLowerCase();
 
     if (city) submissions = submissions.filter(s => s.city === city);
     if (status) submissions = submissions.filter(s => (s.status || '待审核') === status);
+    if (course) submissions = submissions.filter(s => (s.courses || []).some(c => String(c) === String(course)));
+    if (org) submissions = submissions.filter(s => s.org === org);
     if (search) {
       const isSales = this.isSales();
       submissions = submissions.filter(s =>
@@ -665,6 +691,10 @@ const Admin = {
         <select class="form-control" id="scheduleVenue">${venueOptions}</select>
       </div>
       <div class="form-group" style="margin-top:12px;">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">场地详细地址（可选，用于确认单）</label>
+        <input type="text" class="form-control" id="scheduleVenueAddr" placeholder="如：盐田区大梅沙华大时空中心 X 楼" value="${this.escapeHtml(s.venueAddr || '')}">
+      </div>
+      <div class="form-group" style="margin-top:12px;">
         <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">排期日期</label>
         <input type="date" class="form-control" id="scheduleDate" value="${s.date || ''}">
       </div>
@@ -772,6 +802,7 @@ const Admin = {
     const staff = document.getElementById('scheduleStaff').value;
     const teacher = document.getElementById('scheduleTeacher').value;
     const venue = document.getElementById('scheduleVenue').value;
+    const venueAddr = (document.getElementById('scheduleVenueAddr') || {}).value || '';
     const date = document.getElementById('scheduleDate').value;
     const start = document.getElementById('scheduleStart').value;
     const end = document.getElementById('scheduleEnd').value;
@@ -808,6 +839,7 @@ const Admin = {
       assigned_delivery: staff,
       assigned_teacher: teacher || '',
       venue,
+      venue_addr: venueAddr,
       scheduled_date: date,
       scheduled_time: slot,
       history,
@@ -815,7 +847,7 @@ const Admin = {
     this.hideModal();
     if (ok) {
       this.showToast('排期成功', 'success');
-      this.applyLocalUpdate(id, { status: '已排课', assignedDelivery: staff, assignedTeacher: teacher || '', venue, scheduledDate: date, scheduledTime: slot, history });
+      this.applyLocalUpdate(id, { status: '已排课', assignedDelivery: staff, assignedTeacher: teacher || '', venue, venueAddr, scheduledDate: date, scheduledTime: slot, history });
     } else {
       this.showToast('排期失败，请重试', 'error');
     }

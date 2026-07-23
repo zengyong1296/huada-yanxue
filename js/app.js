@@ -170,6 +170,7 @@ const App = {
             <span>👥 ${course.groupSize}</span>
             <span>🎓 ${course.grade}</span>
           </div>
+          <div class="course-intro">${cityVenueText(course.goal, this.state.city)}</div>
         </div>
         <div class="course-detail-wrap" id="detail-${course.id}">
           <div class="course-card-body">

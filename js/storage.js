@@ -226,12 +226,25 @@ const Storage = {
   async updateSubmission(id, patch) {
     const sb = getSupabase();
     if (!sb) return false;
-    const { error } = await sb
-      .from('submissions')
-      .update(patch)
-      .eq('id', parseInt(id));
-    if (error) { console.error('[Storage] 更新失败:', error.message); return false; }
-    return true;
+    try {
+      const { error } = await sb.from('submissions').update(patch).eq('id', parseInt(id));
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      // 容错：若新增列（如 venue_addr）尚未执行迁移、数据库无该列，自动去掉该列后重试，
+      // 保证其余字段仍能保存，避免整条更新失败（等用户执行迁移后即可正常写入）。
+      const msg = (e && e.message) || '';
+      if (patch.venue_addr !== undefined && /venue_addr/i.test(msg)) {
+        const { venue_addr, ...rest } = patch;
+        try {
+          const { error } = await sb.from('submissions').update(rest).eq('id', parseInt(id));
+          if (error) { console.error('[Storage] 更新失败:', error.message); return false; }
+          return true;
+        } catch (e2) { console.error('[Storage] 更新失败:', (e2 && e2.message) || e2); return false; }
+      }
+      console.error('[Storage] 更新失败:', msg);
+      return false;
+    }
   },
 
   // 保存付款凭证数组（jsonb）到 submissions.payment_proof
@@ -301,6 +314,7 @@ const Storage = {
       quoteNote: row.quote_note || '',
       quoteConfirmed: !!row.quote_confirmed,
       venue: row.venue || '',
+      venueAddr: row.venue_addr || '',
       assignedTeacher: row.assigned_teacher || '',
       actualPeople: row.actual_people || 0,
       execNote: row.exec_note || '',
@@ -567,6 +581,12 @@ const Storage = {
 
   isLoggedIn() {
     return !!this.getSession();
+  },
+
+  // 修改登录手机号后，同步更新本地会话中的用户名（避免刷新前显示旧号）
+  setSessionUsername(phone) {
+    const s = this.getSession();
+    if (s) { s.username = phone; this._saveSession(s); }
   },
 
   // ---------- 数据导出 ----------
