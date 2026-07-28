@@ -292,14 +292,29 @@ const App = {
       hint.textContent = '请选择课程';
     } else {
       hint.textContent = `共 ${items.length} 项安排`;
-      container.innerHTML = items.map((item, idx) => `
-        <div class="schedule-item ${item.type === 'lunch' ? 'lunch-item' : ''}" style="position:relative;">
+      const totalCourses = this.state.selectedCourses.length;
+      container.innerHTML = items.map((item) => {
+        if (item.type === 'lunch') {
+          return `<div class="schedule-item lunch-item" style="position:relative;">
+            <div class="time">${item.time.start} - ${item.time.end}</div>
+            <div class="name">${item.name}</div>
+            <div class="meta">${item.meta || ''}</div>
+          </div>`;
+        }
+        const pos = this.state.selectedCourses.indexOf(item.id);
+        const isFirst = pos === 0;
+        const isLast = pos === totalCourses - 1;
+        return `<div class="schedule-item" style="position:relative;">
+          <div class="move-btns">
+            <button onclick="App.moveCourse(${item.id},-1)" ${isFirst ? 'disabled' : ''} title="上移">▲</button>
+            <button onclick="App.moveCourse(${item.id},1)" ${isLast ? 'disabled' : ''} title="下移">▼</button>
+          </div>
+          <button class="remove-btn" onclick="App.removeCourse(${item.id})" title="删除">×</button>
           <div class="time">${item.time.start} - ${item.time.end}</div>
           <div class="name">${item.name}</div>
           <div class="meta">${item.meta || ''}</div>
-          ${item.type === 'course' ? `<button class="remove-btn" onclick="App.removeCourse(${item.id})">×</button>` : ''}
-        </div>
-      `).join('');
+        </div>`;
+      }).join('');
     }
 
     this.updateTotal();
@@ -320,6 +335,16 @@ const App = {
       }
       this.updateSchedule();
     }
+  },
+
+  moveCourse(courseId, dir) {
+    const arr = this.state.selectedCourses;
+    const idx = arr.indexOf(courseId);
+    if (idx < 0) return;
+    const target = idx + dir;
+    if (target < 0 || target >= arr.length) return;
+    [arr[idx], arr[target]] = [arr[target], arr[idx]];
+    this.updateSchedule();
   },
 
   // ---------- 费用计算 ----------
@@ -499,6 +524,8 @@ const App = {
   async queryStatus() {
     const org = document.getElementById('qOrg').value.trim();
     const phone = document.getElementById('qPhone').value.trim();
+    const codeEl = document.getElementById('qCode');
+    const code = codeEl ? codeEl.value.trim() : '';
     const resultEl = document.getElementById('queryResult');
 
     if (!org || !phone) {
@@ -518,14 +545,26 @@ const App = {
     if (btn) { btn.disabled = true; btn.textContent = '查询中...'; }
 
     try {
-      const list = await Storage.queryByInstitute(phone, org);
+      let list = await Storage.queryByInstitute(phone, org);
       if (btn) { btn.disabled = false; btn.textContent = '查询状态'; }
 
       if (!list || list.length === 0) {
         resultEl.innerHTML = '<div class="query-empty">未查询到该机构的报名记录，请核对机构名称与手机号是否填写正确。</div>';
         return;
       }
-      this.enterSelfView(org, phone);
+      // 查询码作为查看钥匙：若用户填写，必须命中某条记录的查询码
+      if (code) {
+        const matched = list.filter(s => String(s.trackingCode || '') === code);
+        if (matched.length === 0) {
+          resultEl.innerHTML = '<div class="query-empty">查询码与「' + this.escapeHtml(org) + '」的报名记录不匹配，请核对查询码是否正确。</div>';
+          return;
+        }
+        list = matched;
+      } else if (list.length > 1) {
+        resultEl.innerHTML = '<div class="query-empty">该机构有多条报名记录，请输入提交成功后返回的「查询码」以精确定位。</div>';
+        return;
+      }
+      this.enterSelfView(org, phone, { list });
     } catch (e) {
       if (btn) { btn.disabled = false; btn.textContent = '查询状态'; }
       this.showToast('查询失败：' + (e.message || '网络错误'), 'error');
@@ -946,7 +985,7 @@ const App = {
     document.body.classList.add('self-open');
     this._syncSelfUrl(org, phone);
     try {
-      const list = await Storage.queryByInstitute(phone, org);
+      const list = (opts && opts.list && opts.list.length) ? opts.list : await Storage.queryByInstitute(phone, org);
       this.renderSelfView(list, org, opts);
     } catch (e) {
       if (body) body.innerHTML = '<div class="query-empty">查询失败：' + this.escapeHtml(e.message || '网络错误') + '</div>';
@@ -960,7 +999,7 @@ const App = {
       this.state.queryResults = list || [];
       this.state.activeGroupId = null;
       const sc = document.getElementById('myPortalShortcut'); if (sc) sc.innerHTML = '';
-      body.innerHTML = '<div class="self-success">✅ 报名提交成功！以下是您的研学服务，可随时凭「机构名称 + 手机号」重新查询。</div>' +
+      body.innerHTML = '<div class="self-success">✅ 报名提交成功！以下是您的研学服务，请保存「查询码」，下次可凭「机构名称 + 手机号 + 查询码」重新查询。</div>' +
         this.renderGroupView(org);
       return;
     }

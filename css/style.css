@@ -762,12 +762,45 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   background: var(--red);
   color: #fff;
   font-size: 14px;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.schedule-item:hover .remove-btn { display: flex; }
+.schedule-item .move-btns {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.schedule-item .move-btns button {
+  width: 20px;
+  height: 18px;
+  border-radius: 4px;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.schedule-item .move-btns button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.schedule-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: -8px 0 12px;
+}
 
 .schedule-empty {
   text-align: center;
